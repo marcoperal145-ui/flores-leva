@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Para Leva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===================== TOKENS ===================== */
+  :root{
+    --black:#07080a;
+    --green-deep:#0d1710;
+    --green-deeper:#070d08;
+    --gold:#e2b04a;
+    --gold-bright:#ffd873;
+    --gold-soft:#f4d488;
+    --pastel:#fbe8ad;
+    --warm-white:#faf3e3;
+    --stem:#20321d;
+    --stem-dark:#132014;
+
+    --serif:'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    --sans:'Jost', 'Helvetica Neue', Arial, sans-serif;
+
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;}
+  html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    background:radial-gradient(120% 120% at 50% 30%, var(--green-deep) 0%, var(--black) 65%, #050604 100%);
+    font-family:var(--sans);
+    color:var(--warm-white);
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+
+  /* ===================== BACKGROUND LAYERS ===================== */
+  #bgCanvas{
+    position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;
+  }
+  #petalsLayer{
+    position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden;
+  }
+  .petal{
+    position:absolute;
+    top:-5vh;
+    width:14px;height:14px;
+    background:linear-gradient(135deg,var(--gold-bright),var(--gold));
+    border-radius:0 60% 0 60%;
+    opacity:.85;
+    will-change:transform,opacity;
+  }
+  .petal.rise{ top:auto; bottom:-6vh; }
+
+  #gardenLayer{
+    position:fixed;inset:0;z-index:2;
+    opacity:0;
+    transition:opacity 2.2s ease;
+    pointer-events:none;
+  }
+  body[data-scene="garden"] #gardenLayer,
+  body[data-scene="message"] #gardenLayer,
+  body[data-scene="flower"] #gardenLayer,
+  body[data-scene="finale"] #gardenLayer{ opacity:1; }
+
+  #gardenLayer.fade-away{
+    opacity:0 !important;
+    transition:opacity 3.5s ease;
+  }
+
+  #gardenStage{
+    position:absolute;
+    left:0;right:0;bottom:0;
+    height:58vh;
+    transform:rotate(0deg);
+    transition:transform .3s ease-out;
+  }
+  .flower-wrap{
+    position:absolute;
+    bottom:0;
+    transform-origin:bottom center;
+  }
+  .stem{
+    transform-origin:bottom center;
+    animation:sway var(--sway-dur,6s) ease-in-out infinite;
+    animation-delay:var(--sway-delay,0s);
+  }
+  .bloom-scale{
+    transform-origin:center;
+  }
+
+  @keyframes sway{
+    0%,100%{ transform:rotate(calc(-1deg * var(--sway-amt,2))); }
+    50%{ transform:rotate(calc(1deg * var(--sway-amt,2))); }
+  }
+
+  #gardenDim{
+    position:fixed;inset:0;z-index:3;
+    background:radial-gradient(80% 60% at 50% 62%, rgba(5,6,4,.15), rgba(4,5,3,.72) 100%);
+    opacity:0;
+    transition:opacity 1.8s ease;
+    pointer-events:none;
+  }
+  body[data-scene="message"] #gardenDim,
+  body[data-scene="flower"] #gardenDim{ opacity:1; }
+
+  #glow{
+    position:fixed;inset:0;z-index:4;
+    display:flex;align-items:center;justify-content:center;
+    pointer-events:none;
+  }
+  #glow .core{
+    width:10px;height:10px;border-radius:50%;
+    background:radial-gradient(circle, rgba(255,216,115,.95) 0%, rgba(226,176,74,.5) 35%, rgba(226,176,74,0) 70%);
+    opacity:0;
+    filter:blur(2px);
+  }
+  body[data-scene="finale"] #glow .core{
+    animation:glowGrow 4.5s ease-out forwards;
+  }
+  @keyframes glowGrow{
+    0%{ width:10px;height:10px;opacity:0; }
+    30%{ opacity:1; }
+    100%{ width:220vmax;height:220vmax;opacity:1; }
+  }
+
+  /* ===================== FEATURED FLOWER ===================== */
+  #featuredWrap{
+    position:fixed;
+    left:50%;top:56%;
+    transform:translate(-50%,-50%);
+    z-index:6;
+    width:min(46vw, 260px);
+    display:none;
+    cursor:pointer;
+    filter:drop-shadow(0 0 24px rgba(226,176,74,.35));
+  }
+  body[data-scene="flower"] #featuredWrap,
+  body[data-scene="finale"] #featuredWrap{ display:block; }
+  body[data-scene="finale"] #featuredWrap{
+    animation:flowerFadeOut 2.4s ease forwards;
+    pointer-events:none;
+  }
+  @keyframes flowerFadeOut{ to{ opacity:0; transform:translate(-50%,-50%) translateY(-6vh) scale(.7); } }
+
+  #featuredWrap .fpetal{
+    transition:transform 1.4s cubic-bezier(.2,.8,.2,1);
+  }
+  #featuredWrap.open .fpetal{
+    transform:translateY(-14px) scale(1.08) rotate(var(--openrot,0deg));
+  }
+  #featuredWrap .hint{
+    text-align:center;
+    font-family:var(--sans);
+    font-weight:300;
+    font-size:clamp(.7rem,2.2vw,.85rem);
+    letter-spacing:.04em;
+    color:var(--pastel);
+    opacity:.65;
+    margin-top:14px;
+  }
+  body[data-scene="finale"] #featuredWrap .hint{ display:none; }
+
+  /* ===================== TEXT SCENES ===================== */
+  .scene{
+    position:fixed;inset:0;z-index:10;
+    display:flex;align-items:center;justify-content:center;
+    padding:8vh 6vw;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 1.1s ease;
+  }
+  body[data-scene="intro"]   .scene[data-for="intro"]{ opacity:1; pointer-events:auto; }
+  body[data-scene="reveal"]  .scene[data-for="reveal"]{ opacity:1; pointer-events:auto; }
+  body[data-scene="garden"]  .scene[data-for="garden"]{ opacity:1; pointer-events:auto; }
+  body[data-scene="message"] .scene[data-for="message"]{ opacity:1; pointer-events:auto; }
+  body[data-scene="flower"]  .scene[data-for="flower"]{ opacity:1; pointer-events:auto; }
+  body[data-scene="finale"]  .scene[data-for="finale"]{ opacity:1; pointer-events:auto; }
+
+  .scene-inner{
+    max-width:640px;
+    text-align:center;
+  }
+
+  .eyebrow-line{
+    font-family:var(--serif);
+    font-style:italic;
+    font-weight:500;
+    font-size:clamp(1.3rem,3.4vw,2.1rem);
+    color:var(--warm-white);
+    line-height:1.4;
+    opacity:0;
+    animation:fadeUp 1.6s ease forwards;
+    animation-delay:.4s;
+  }
+
+  @keyframes fadeUp{
+    from{ opacity:0; transform:translateY(16px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .btn{
+    margin-top:44px;
+    display:inline-block;
+    padding:14px 38px;
+    font-family:var(--sans);
+    font-weight:400;
+    font-size:clamp(.85rem,2.4vw,1rem);
+    letter-spacing:.06em;
+    color:var(--black);
+    background:linear-gradient(135deg,var(--gold-bright),var(--gold));
+    border:none;
+    border-radius:999px;
+    cursor:pointer;
+    opacity:0;
+    animation:fadeUp 1.4s ease forwards;
+    animation-delay:1.6s;
+    box-shadow:0 0 0 rgba(226,176,74,0);
+    transition:box-shadow .4s ease, transform .25s ease;
+  }
+  .btn:hover{ box-shadow:0 0 34px rgba(255,216,115,.55); transform:translateY(-2px); }
+  .btn:active{ transform:translateY(0px) scale(.97); }
+
+  .btn-ghost{
+    margin-top:52px;
+    background:none;
+    border:1px solid rgba(250,243,227,.35);
+    color:var(--pastel);
+    padding:12px 30px;
+    border-radius:999px;
+    font-family:var(--sans);
+    font-size:clamp(.75rem,2vw,.85rem);
+    letter-spacing:.05em;
+    cursor:pointer;
+    opacity:0;
+    transition:border-color .4s ease, color .4s ease, box-shadow .4s ease;
+  }
+  .btn-ghost.show{ animation:fadeUp 1.4s ease forwards; }
+  .btn-ghost:hover{ border-color:var(--gold-bright); color:var(--gold-bright); box-shadow:0 0 22px rgba(255,216,115,.25); }
+
+  /* name reveal */
+  .name-big{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(3.2rem,13vw,7.5rem);
+    color:transparent;
+    background:linear-gradient(180deg,var(--gold-bright),var(--gold) 60%,#b98a2f);
+    -webkit-background-clip:text;background-clip:text;
+    letter-spacing:.04em;
+    line-height:1;
+  }
+  .name-big span{
+    display:inline-block;
+    opacity:0;
+    transform:translateY(18px);
+    animation:letterIn .9s cubic-bezier(.2,.8,.2,1) forwards;
+  }
+  @keyframes letterIn{ to{ opacity:1; transform:translateY(0); } }
+
+  .sub-line{
+    margin-top:26px;
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:clamp(1.05rem,2.6vw,1.4rem);
+    color:var(--pastel);
+    opacity:0;
+    animation:fadeUp 1.4s ease forwards;
+    animation-delay:1.8s;
+  }
+
+  /* word-stagger paragraphs */
+  .word-reveal .w{
+    display:inline-block;
+    opacity:0;
+    transform:translateY(10px);
+    filter:blur(2px);
+    animation:wordIn .7s ease forwards;
+  }
+  @keyframes wordIn{ to{ opacity:1; transform:translateY(0); filter:blur(0); } }
+
+  .msg-title{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(2.2rem,7vw,3.6rem);
+    color:var(--gold-bright);
+    margin-bottom:22px;
+    opacity:0;
+    animation:fadeUp 1.2s ease forwards;
+  }
+  .msg-para{
+    font-family:var(--serif);
+    font-size:clamp(1.15rem,3vw,1.55rem);
+    line-height:1.55;
+    color:var(--warm-white);
+    margin:0 0 18px 0;
+  }
+  .msg-para.p2{ color:var(--pastel); }
+
+  .flower-line{
+    font-family:var(--serif);
+    font-size:clamp(1.2rem,3.4vw,1.7rem);
+    color:var(--gold-bright);
+    margin-bottom:14px;
+  }
+  .flower-line.small{
+    font-size:clamp(1rem,2.6vw,1.25rem);
+    color:var(--pastel);
+    font-style:italic;
+  }
+
+  .final-name{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(2.6rem,9vw,4.6rem);
+    color:var(--gold-bright);
+    margin-bottom:20px;
+    opacity:0;
+    animation:fadeUp 1.6s ease forwards;
+  }
+  .final-msg{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:clamp(1.1rem,3vw,1.5rem);
+    color:var(--warm-white);
+    line-height:1.5;
+    margin-bottom:20px;
+  }
+  .final-small{
+    font-family:var(--sans);
+    font-weight:300;
+    font-size:clamp(.75rem,2.1vw,.9rem);
+    color:var(--pastel);
+    opacity:.75;
+    letter-spacing:.02em;
+    max-width:420px;
+    margin:0 auto;
+  }
+
+  .tap-hint{
+    margin-top:38px;
+    font-family:var(--sans);
+    font-size:clamp(.7rem,2vw,.82rem);
+    letter-spacing:.08em;
+    color:rgba(250,243,227,.55);
+    opacity:0;
+    animation:pulseHint 2.6s ease-in-out infinite;
+    animation-delay:2.4s;
+  }
+  @keyframes pulseHint{
+    0%,100%{ opacity:0; }
+    50%{ opacity:.7; }
+  }
+
+  /* reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    .stem, .petal, .name-big span, .word-reveal .w{ animation-duration:.01ms !important; }
+  }
+
+  /* mobile fine-tuning */
+  @media (max-width:640px){
+    #gardenStage{ height:46vh; }
+    #featuredWrap{ width:52vw; top:52%; }
+    .scene{ padding:6vh 7vw; }
+  }
+</style>
+</head>
+<body data-scene="intro">
+
+  <canvas id="bgCanvas"></canvas>
+  <div id="petalsLayer"></div>
+
+  <div id="gardenLayer">
+    <div id="gardenStage"></div>
+  </div>
+  <div id="gardenDim"></div>
+  <div id="glow"><div class="core"></div></div>
+
+  <div id="featuredWrap"></div>
+
+  <!-- SCENE 1: INTRO -->
+  <section class="scene" data-for="intro">
+    <div class="scene-inner">
+      <p class="eyebrow-line">Hay algo que quiero mostrarte&hellip;</p>
+      <button class="btn" id="btnEnter">Entrar ✨</button>
+    </div>
+  </section>
+
+  <!-- SCENE 2: NAME REVEAL -->
+  <section class="scene" data-for="reveal">
+    <div class="scene-inner">
+      <h1 class="name-big" id="nameBig"></h1>
+      <p class="sub-line">Esto es para ti. 💛</p>
+      <p class="tap-hint">toca para continuar</p>
+    </div>
+  </section>
+
+  <!-- SCENE 3: GARDEN GROWING -->
+  <section class="scene" data-for="garden">
+    <div class="scene-inner">
+      <p class="tap-hint" style="animation-delay:.4s;">observa&hellip;</p>
+    </div>
+  </section>
+
+  <!-- SCENE 4: MAIN MESSAGE -->
+  <section class="scene" data-for="message">
+    <div class="scene-inner">
+      <h2 class="msg-title">Leva 🌻</h2>
+      <p class="msg-para word-reveal" id="msgP1"></p>
+      <p class="msg-para p2 word-reveal" id="msgP2" style="opacity:0;"></p>
+      <p class="tap-hint" id="msgHint">toca para continuar</p>
+    </div>
+  </section>
+
+  <!-- SCENE 5: FEATURED FLOWER -->
+  <section class="scene" data-for="flower">
+    <div class="scene-inner" style="margin-top:30vh;">
+      <p class="flower-line word-reveal" id="flowerP1" style="opacity:0;"></p>
+      <p class="flower-line small word-reveal" id="flowerP2" style="opacity:0;"></p>
+      <button class="btn-ghost" id="btnSecret">Todavía hay algo más&hellip;</button>
+    </div>
+  </section>
+
+  <!-- SCENE 6: FINALE -->
+  <section class="scene" data-for="finale">
+    <div class="scene-inner">
+      <h2 class="final-name">Leva 💛</h2>
+      <p class="final-msg">Que nunca te falten flores, momentos bonitos y razones para sonreír.</p>
+      <p class="final-small" id="finalSmall" style="opacity:0;"></p>
+    </div>
+  </section>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     UTILITIES
+  ============================================================ */
+  const $ = (sel)=>document.querySelector(sel);
+  const rand = (a,b)=> a + Math.random()*(b-a);
+  const isMobile = window.matchMedia('(pointer:coarse)').matches || window.innerWidth < 700;
+  const body = document.body;
+
+  function goToScene(name){
+    body.dataset.scene = name;
+  }
+
+  /* wraps text into word-spans for a staggered reveal, then plays it */
+  function revealWords(el, text, opts){
+    opts = opts || {};
+    const baseDelay = opts.baseDelay || 0;
+    const gap = opts.gap || 0.06;
+    el.innerHTML = '';
+    el.style.opacity = 1;
+    const words = text.split(' ');
+    words.forEach((w,i)=>{
+      const span = document.createElement('span');
+      span.className = 'w';
+      span.textContent = w + (i < words.length-1 ? '\u00A0' : '');
+      span.style.animationDelay = (baseDelay + i*gap) + 's';
+      el.appendChild(span);
+    });
+    return baseDelay + words.length*gap + 0.7; // approx time to finish, seconds
+  }
+
+  /* ============================================================
+     AMBIENT GOLDEN DUST — canvas background
+  ============================================================ */
+  const canvas = $('#bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, dust = [];
+  const DUST_COUNT = isMobile ? 40 : 90;
+
+  function resizeCanvas(){
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  function makeDust(){
+    dust = [];
+    for(let i=0;i<DUST_COUNT;i++){
+      dust.push({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        r: rand(0.6,2.2),
+        vx: rand(-.06,.06),
+        vy: rand(-.09,-.02),
+        a: rand(.15,.7),
+        tw: rand(0,Math.PI*2)
+      });
+    }
+  }
+  makeDust();
+  window.addEventListener('resize', makeDust);
+
+  const pointer = { x: W/2, y: H/2, active:false };
+  function updatePointer(x,y){ pointer.x = x; pointer.y = y; pointer.active = true; }
+  window.addEventListener('mousemove', e=>updatePointer(e.clientX, e.clientY));
+  window.addEventListener('touchmove', e=>{
+    if(e.touches && e.touches[0]) updatePointer(e.touches[0].clientX, e.touches[0].clientY);
+  }, {passive:true});
+
+  function drawDust(){
+    ctx.clearRect(0,0,W,H);
+    for(const p of dust){
+      p.tw += 0.02;
+      p.x += p.vx;
+      p.y += p.vy;
+
+      // gentle response to cursor: slight drift away within radius
+      const dx = p.x - pointer.x, dy = p.y - pointer.y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      if(dist < 120 && dist > 0.1){
+        const f = (120-dist)/120*0.35;
+        p.x += (dx/dist)*f;
+        p.y += (dy/dist)*f;
+      }
+
+      if(p.y < -10){ p.y = H+10; p.x = Math.random()*W; }
+      if(p.x < -10) p.x = W+10;
+      if(p.x > W+10) p.x = -10;
+
+      const alpha = p.a * (0.6 + 0.4*Math.sin(p.tw));
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(255, 216, 133, ${alpha})`;
+      ctx.shadowColor = 'rgba(255,200,110,0.8)';
+      ctx.shadowBlur = 6;
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    requestAnimationFrame(drawDust);
+  }
+  requestAnimationFrame(drawDust);
+
+  /* ============================================================
+     FALLING / RISING PETALS
+  ============================================================ */
+  const petalsLayer = $('#petalsLayer');
+  let petalDirection = 'fall'; // 'fall' | 'rise' | 'off'
+  let petalTimer = null;
+  const PETAL_INTERVAL = isMobile ? 420 : 260;
+
+  function spawnPetal(){
+    if(petalDirection === 'off') return;
+    const petal = document.createElement('div');
+    petal.className = 'petal' + (petalDirection === 'rise' ? ' rise' : '');
+    const startX = rand(0,100);
+    const drift = rand(-60,60);
+    const duration = rand(5,9.5);
+    const rot = rand(180,720) * (Math.random()<0.5?-1:1);
+    const size = rand(9,16);
+    const hue = rand(-8,10);
+
+    petal.style.left = startX + 'vw';
+    petal.style.width = size+'px';
+    petal.style.height = size+'px';
+    petal.style.filter = `hue-rotate(${hue}deg)`;
+    petal.style.setProperty('--drift', drift+'vw');
+    petal.style.animation = `${petalDirection === 'rise' ? 'petalRise' : 'petalFall'} ${duration}s ease-in forwards`;
+
+    petalsLayer.appendChild(petal);
+    petal.addEventListener('animationend', ()=> petal.remove());
+  }
+
+  // keyframes injected dynamically so we can use the --drift custom property
+  const styleEl = document.createElement('style');
+  styleEl.textContent = `
+    @keyframes petalFall{
+      0%{ transform:translate(0,0) rotate(0deg); opacity:0; }
+      8%{ opacity:.9; }
+      100%{ transform:translate(var(--drift), 112vh) rotate(480deg); opacity:0; }
+    }
+    @keyframes petalRise{
+      0%{ transform:translate(0,0) rotate(0deg); opacity:0; }
+      10%{ opacity:.9; }
+      100%{ transform:translate(var(--drift), -118vh) rotate(-480deg); opacity:0; }
+    }
+  `;
+  document.head.appendChild(styleEl);
+
+  function startPetals(direction){
+    petalDirection = direction;
+    if(petalTimer) clearInterval(petalTimer);
+    if(direction === 'off') return;
+    petalTimer = setInterval(spawnPetal, PETAL_INTERVAL);
+  }
+
+  /* ============================================================
+     FLOWER FACTORY (SVG) — each one visually unique
+  ============================================================ */
+  function makeFlowerSVG(size, petalCount, hue, big){
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 200 200');
+    svg.setAttribute('width', size);
+    svg.setAttribute('height', size);
+    svg.classList.add('bloom-scale');
+
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('transform', 'translate(100,100)');
+
+    const petalColorA = `hsl(${44+hue}, 78%, ${big?68:60}%)`;
+    const petalColorB = `hsl(${38+hue}, 85%, ${big?52:45}%)`;
+
+    for(let i=0;i<petalCount;i++){
+      const angle = (360/petalCount)*i;
+      const petal = document.createElementNS(ns, 'ellipse');
+      petal.setAttribute('cx', '0');
+      petal.setAttribute('cy', '-46');
+      petal.setAttribute('rx', 16 + rand(-2,3));
+      petal.setAttribute('ry', 42 + rand(-4,4));
+      petal.setAttribute('fill', `url(#grad-${hue}-${i}-${big?1:0})`);
+      petal.classList.add('fpetal');
+      petal.style.setProperty('--openrot', (angle>180? angle-360 : angle)*0.15 + 'deg');
+      petal.setAttribute('transform', `rotate(${angle})`);
+      petal.setAttribute('opacity', '0.97');
+
+      const grad = document.createElementNS(ns,'linearGradient');
+      grad.setAttribute('id', `grad-${hue}-${i}-${big?1:0}`);
+      grad.setAttribute('x1','0'); grad.setAttribute('y1','1');
+      grad.setAttribute('x2','0'); grad.setAttribute('y2','0');
+      const s1 = document.createElementNS(ns,'stop'); s1.setAttribute('offset','0%'); s1.setAttribute('stop-color', petalColorB);
+      const s2 = document.createElementNS(ns,'stop'); s2.setAttribute('offset','100%'); s2.setAttribute('stop-color', petalColorA);
+      grad.appendChild(s1); grad.appendChild(s2);
+
+      const defs = document.createElementNS(ns,'defs');
+      defs.appendChild(grad);
+      g.appendChild(defs);
+      g.appendChild(petal);
+    }
+
+    const center = document.createElementNS(ns, 'circle');
+    center.setAttribute('r', big? 20:16);
+    center.setAttribute('fill', 'url(#centerGrad)');
+    g.appendChild(center);
+
+    if(!document.getElementById('centerGradDef')){
+      const defs2 = document.createElementNS(ns,'defs');
+      defs2.id = 'centerGradDef';
+      const grad2 = document.createElementNS(ns,'radialGradient');
+      grad2.setAttribute('id','centerGrad');
+      const c1 = document.createElementNS(ns,'stop'); c1.setAttribute('offset','0%'); c1.setAttribute('stop-color','#5a3d16');
+      const c2 = document.createElementNS(ns,'stop'); c2.setAttribute('offset','100%'); c2.setAttribute('stop-color','#2c1d0b');
+      grad2.appendChild(c1); grad2.appendChild(c2);
+      defs2.appendChild(grad2);
+      svg.appendChild(defs2);
+    }
+
+    svg.appendChild(g);
+    return svg;
+  }
+
+  /* ============================================================
+     GARDEN GROWTH
+  ============================================================ */
+  const gardenStage = $('#gardenStage');
+  let gardenGrown = false;
+
+  function growGarden(){
+    if(gardenGrown) return;
+    gardenGrown = true;
+
+    const count = isMobile ? 9 : 15;
+    for(let i=0;i<count;i++){
+      const wrap = document.createElement('div');
+      wrap.className = 'flower-wrap';
+
+      const leftPct = (i/(count-1))*88 + rand(-3,3) + 4;
+      const heightStem = rand(90,170);
+      const flowerSize = rand(46,78);
+      const petalCount = Math.round(rand(6,9));
+      const hue = rand(-6,10);
+      const delay = i*0.18 + rand(0,0.25);
+      const swayDur = rand(4.5,7.5);
+      const swayAmt = rand(1.4,3);
+
+      wrap.style.left = leftPct + '%';
+      wrap.style.zIndex = Math.round(10 + leftPct);
+
+      const stem = document.createElement('div');
+      stem.className = 'stem';
+      stem.style.setProperty('--sway-dur', swayDur+'s');
+      stem.style.setProperty('--sway-delay', (-delay)+'s');
+      stem.style.setProperty('--sway-amt', swayAmt);
+      stem.style.width = '4px';
+      stem.style.height = heightStem+'px';
+      stem.style.margin = '0 auto';
+      stem.style.background = 'linear-gradient(180deg, var(--stem), var(--stem-dark))';
+      stem.style.borderRadius = '3px';
+      stem.style.transformOrigin = 'bottom center';
+      stem.style.transform = 'scaleY(0)';
+      stem.style.transition = `transform 1.1s cubic-bezier(.2,.8,.2,1) ${delay}s`;
+
+      // a couple of leaves
+      const leaf = document.createElement('div');
+      leaf.style.position = 'absolute';
+      leaf.style.bottom = (heightStem*0.35)+'px';
+      leaf.style.left = (Math.random()<0.5? -14: 6)+'px';
+      leaf.style.width='20px'; leaf.style.height='10px';
+      leaf.style.background='linear-gradient(120deg,#2c4322,#17240f)';
+      leaf.style.borderRadius='0 60% 0 60%';
+      leaf.style.opacity='0';
+      leaf.style.transform='scale(0)';
+      leaf.style.transition = `opacity .8s ease ${delay+0.6}s, transform .8s cubic-bezier(.3,1,.4,1) ${delay+0.6}s`;
+      stem.appendChild(leaf);
+
+      const flowerHolder = document.createElement('div');
+      flowerHolder.style.position='absolute';
+      flowerHolder.style.bottom = heightStem+'px';
+      flowerHolder.style.left='50%';
+      flowerHolder.style.transform='translateX(-50%) scale(0)';
+      flowerHolder.style.opacity='0';
+      flowerHolder.style.transition = `transform .9s cubic-bezier(.34,1.4,.4,1) ${delay+0.55}s, opacity .6s ease ${delay+0.55}s`;
+
+      const svg = makeFlowerSVG(flowerSize, petalCount, hue, false);
+      flowerHolder.appendChild(svg);
+      stem.appendChild(flowerHolder);
+      wrap.appendChild(stem);
+      gardenStage.appendChild(wrap);
+
+      requestAnimationFrame(()=>{
+        setTimeout(()=>{
+          stem.style.transform = 'scaleY(1)';
+          leaf.style.opacity = '1';
+          leaf.style.transform = 'scale(1)';
+          flowerHolder.style.transform = 'translateX(-50%) scale(1)';
+          flowerHolder.style.opacity = '1';
+        }, 20);
+      });
+    }
+  }
+
+  /* subtle parallax / tilt of whole garden toward pointer */
+  function tiltLoop(){
+    if(body.dataset.scene === 'garden' || body.dataset.scene === 'message' || body.dataset.scene === 'flower'){
+      const nx = (pointer.x / W - 0.5) * 2;
+      gardenStage.style.transform = `rotate(${nx*1.6}deg) translateY(${Math.abs(nx)*4}px)`;
+    }
+    requestAnimationFrame(tiltLoop);
+  }
+  requestAnimationFrame(tiltLoop);
+
+  /* ============================================================
+     FEATURED FLOWER + BURST
+  ============================================================ */
+  const featuredWrap = $('#featuredWrap');
+  function buildFeaturedFlower(){
+    featuredWrap.innerHTML = '';
+    const svg = makeFlowerSVG(isMobile? 190: 240, 8, 4, true);
+    featuredWrap.appendChild(svg);
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = 'toca la flor';
+    featuredWrap.appendChild(hint);
+  }
+
+  function burstFromCenter(){
+    const rect = featuredWrap.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    const n = isMobile? 26 : 46;
+    for(let i=0;i<n;i++){
+      const p = document.createElement('div');
+      p.style.position='fixed';
+      p.style.left = cx+'px';
+      p.style.top = cy+'px';
+      p.style.width = rand(5,11)+'px';
+      p.style.height = p.style.width;
+      p.style.borderRadius = Math.random()<0.5? '0 60% 0 60%':'50%';
+      p.style.background = `linear-gradient(135deg, var(--gold-bright), var(--gold))`;
+      p.style.zIndex = 20;
+      p.style.pointerEvents='none';
+      const ang = Math.random()*Math.PI*2;
+      const dist = rand(80,260);
+      const dx = Math.cos(ang)*dist;
+      const dy = Math.sin(ang)*dist - rand(20,80);
+      const dur = rand(1.1,1.9);
+      p.animate([
+        { transform:'translate(0,0) scale(0.5)', opacity:1 },
+        { transform:`translate(${dx*0.6}px, ${dy*0.6}px) scale(1)`, opacity:1, offset:0.5 },
+        { transform:`translate(${dx}px, ${dy+140}px) scale(.4)`, opacity:0 }
+      ], { duration: dur*1000, easing:'cubic-bezier(.2,.7,.3,1)' });
+      document.body.appendChild(p);
+      setTimeout(()=>p.remove(), dur*1000+50);
+    }
+  }
+
+  /* ============================================================
+     SCENE FLOW
+  ============================================================ */
+
+  // Scene 1 -> 2
+  $('#btnEnter').addEventListener('click', ()=>{
+    goToScene('reveal');
+    playNameReveal();
+  });
+
+  function playNameReveal(){
+    const nameEl = $('#nameBig');
+    nameEl.innerHTML = '';
+    const letters = 'Leva'.split('');
+    letters.forEach((ch,i)=>{
+      const span = document.createElement('span');
+      span.textContent = ch;
+      span.style.animationDelay = (0.15*i)+'s';
+      nameEl.appendChild(span);
+    });
+  }
+
+  // Scene 2 -> 3 (tap anywhere)
+  document.querySelector('[data-for="reveal"]').addEventListener('click', ()=>{
+    goToScene('garden');
+    startPetals('fall');
+    growGarden();
+    // total garden animation ~ count*0.18 + 1.6s buffer
+    const totalMs = (isMobile? 9:15)*180 + 2600;
+    setTimeout(()=>{
+      goToScene('message');
+      playMessage();
+    }, totalMs);
+  });
+
+  function playMessage(){
+    const p1 = $('#msgP1');
+    const p2 = $('#msgP2');
+    p1.style.opacity = 1;
+    const t1 = revealWords(p1, 'Hay personas que llegan a nuestra vida y hacen que todo tenga un color diferente.', {baseDelay:0, gap:0.05});
+    setTimeout(()=>{
+      p2.style.opacity = 1;
+      revealWords(p2, 'Y tú eres una de ellas.', {baseDelay:0, gap:0.08});
+    }, (t1+0.6)*1000);
+  }
+
+  // Scene 4 -> 5 (tap anywhere)
+  document.querySelector('[data-for="message"]').addEventListener('click', ()=>{
+    goToScene('flower');
+    buildFeaturedFlower();
+    setTimeout(bindFeaturedFlower, 60);
+  });
+
+  function bindFeaturedFlower(){
+    featuredWrap.addEventListener('click', onFlowerClick, {once:true});
+  }
+
+  function onFlowerClick(){
+    featuredWrap.classList.add('open');
+    const hint = featuredWrap.querySelector('.hint');
+    if(hint) hint.style.opacity = '0';
+    burstFromCenter();
+
+    setTimeout(()=>{
+      const p1 = $('#flowerP1');
+      const p2 = $('#flowerP2');
+      p1.style.opacity = 1;
+      const t1 = revealWords(p1, 'Esta flor es para ti, Leva.', {gap:0.07});
+      setTimeout(()=>{
+        p2.style.opacity = 1;
+        revealWords(p2, 'Porque algunas cosas bonitas no necesitan una razón complicada… simplemente nacen.', {gap:0.045});
+        setTimeout(()=>{
+          const btn = $('#btnSecret');
+          btn.classList.add('show');
+        }, 2200);
+      }, (t1+0.4)*1000);
+    }, 700);
+  }
+
+  // Scene 5 -> 6 (secret button)
+  $('#btnSecret').addEventListener('click', ()=>{
+    goToScene('finale');
+    $('#gardenLayer').classList.add('fade-away');
+    startPetals('rise');
+    setTimeout(()=> startPetals('off'), 9000);
+
+    setTimeout(()=>{
+      const small = $('#finalSmall');
+      small.style.opacity = 1;
+      revealWords(small, 'Y si algún día ves flores amarillas, recuerda que alguna vez hubo una página creada especialmente para ti.', {gap:0.05});
+    }, 2600);
+  });
+
+  /* subtle vibration-style pulse on touch for key elements (visual only) */
+  function addTouchPulse(el){
+    el.addEventListener('touchstart', ()=>{
+      el.style.transition='transform .12s ease';
+      el.style.transform += ' scale(0.96)';
+      setTimeout(()=>{ el.style.transform = el.style.transform.replace(' scale(0.96)',''); }, 140);
+      if(navigator.vibrate){ try{ navigator.vibrate(8); }catch(e){} }
+    }, {passive:true});
+  }
+  [$('#btnEnter'), $('#btnSecret')].forEach(addTouchPulse);
+
+})();
+</script>
+</body>
+</html>
